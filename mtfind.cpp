@@ -8,6 +8,8 @@
 #include <mutex>
 #include <vector>
 #include <map>
+#include <future>
+#include <algorithm>
 
 using namespace std;
 
@@ -149,12 +151,13 @@ int *pre_kmp(string pattern) {
 	return pie;
 }
 
-void KMP(string text, string pattern, unsigned long counter) {
+vector<resultData> KMP(string text, string pattern, unsigned long counter) {
     static int countIn = 0;
     char ticket {'?'};
 	int* pie=pre_kmp(pattern);
 	int matched_pos = 0;
 	int size = pattern.size();
+    vector<resultData> currentResult;
 
 	for(int current = 0; current < text.length(); current++) {
 		while (matched_pos > 0 && pattern[matched_pos] != text[current] && pattern[matched_pos] != ticket) {
@@ -169,11 +172,13 @@ void KMP(string text, string pattern, unsigned long counter) {
             unsigned short position = current - (size - 1) + 1; 
             string subStr = text.substr(current - (size - 1), size);
             resultData temp{ counter, position, subStr };
-            result.push_back(temp);
+            currentResult.push_back(temp);
             quantity++;
 			matched_pos = pie[0];
 		}
 	}
+
+    return currentResult;
 }
 
 /*
@@ -205,8 +210,6 @@ int main(int argc, char *argv[]) {
 int main(int argc, char* argv []) {
     double startTime, endTime;
 
-
-
     vector<vector<int>> temp;
     unsigned int n = std::thread::hardware_concurrency();
     std::cout << n << " concurrent threads are supported.\n";
@@ -218,17 +221,33 @@ int main(int argc, char* argv []) {
     ifstream in(argv[1]);
 
     if (in.is_open()) {
-        unsigned long counter = 1;
+        unsigned long counter = 0;
         startTime = getCPUTime( );
+        mutex mtx;
 
-        while (getline(in, line)) {
-            KMP(line, pattern, counter);
-            counter++;
+        for(size_t i=0; i<std::thread::hardware_concurrency(); ++i){
+                
+            while (getline(in, line)) {
+
+                 future<vector<resultData>> futures = std::async(std::launch::async, [&] {
+                     {
+                         lock_guard<mutex> lock(mtx);
+                         ++counter;
+                     }
+
+                     vector<resultData> loopResult = KMP(line, pattern, counter);
+
+                     return loopResult;
+                 });
+
+                auto n = futures.get();
+                result.insert(result.cend(), n.begin(), n.end());
+            }
         }
     }
     
-    cout << quantity << "\n";    
 
+    cout << result.size() << endl;
     for(resultData n : result){
         cout << n.string_number << " " << n.position << " " << n.match <<"\n";    
     }

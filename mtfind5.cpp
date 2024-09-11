@@ -24,7 +24,16 @@ atomic<unsigned short> quantity{0};
 mutex result_mutex;
 
 int *pre_kmp(string pattern) {
+    cout << pattern << "LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLl" << endl;
+
 	int size = pattern.size();
+
+    /*
+    for(int i=0; i<size; i++){
+        char t = pattern[i];
+        cout << t << " TTTT" << endl;
+    }
+    */
 
     if(size > 1000){
         cout << "Pattern is too long" << endl;
@@ -51,37 +60,31 @@ int *pre_kmp(string pattern) {
 		}
 
 		pie[i] = k;
-        cout << pie[i] << " LLLLLLLLLLLLLLLLLLLLLLLLLL" << endl;
 	}
-
-    for(int i=0; i< size; i++){
-        int t = pie[i];
-        cout << t << " TTTT" << endl;
-    }
-
 
 	return pie;
 }
 
 vector<resultData> KMP(string text, string pattern, unsigned long counter, int* pie) {
+    cout << text << "line" << endl;
     int matched_pos = 0;
     int size = pattern.size();
     vector<resultData> currentResult;
-    char ticket = '?'; 
 
-    for (int current = 0; current < text.length(); current++) {
-        while (matched_pos > 0 && pattern[matched_pos] != text[current] && pattern[matched_pos] != ticket) {
+    for(int current = 0; current < text.length(); current++) {
+        cout << *pie << "pattern" << endl;
+        while (matched_pos > 0 && pattern[matched_pos] != text[current]) {
             matched_pos = pie[matched_pos - 1];
         }
-
-        if (pattern[matched_pos] == text[current] || pattern[matched_pos] == ticket) {
+        
+        if(pattern[matched_pos] == text[current]) {
             matched_pos++;
         }
-
-        if (matched_pos == size) {
+        
+        if(matched_pos == size) {
             unsigned short position = current - (size - 1) + 1; 
             string subStr = text.substr(current - (size - 1), size);
-            resultData temp{counter, position, subStr};
+            resultData temp{ counter, position, subStr };
             currentResult.push_back(temp);
             quantity++;
             matched_pos = pie[0];
@@ -91,16 +94,18 @@ vector<resultData> KMP(string text, string pattern, unsigned long counter, int* 
     return currentResult;
 }
 
-void process_chunk(vector<string> chunk, string pattern, unsigned long start_line,  int* pie) {
+void process_chunk(vector<string> chunk, string pattern, unsigned long start_line) {
+    int* pie = pre_kmp(pattern);
 
     for(unsigned long i = 0; i < chunk.size(); i++) {
-        //cout << chunk[i] << "CHANK" << endl;
+        cout << chunk[i] << "CHANK" << endl;
         vector<resultData> currentResult = KMP(chunk[i], pattern, start_line + i, pie);
         
         lock_guard<mutex> lock(result_mutex);
         result.insert(result.end(), currentResult.begin(), currentResult.end());
     }
 
+    delete[] pie;
 }
 
 int main(int argc, char* argv []) {
@@ -123,20 +128,19 @@ int main(int argc, char* argv []) {
     vector<thread> threads;
     vector<string> chunk;
     const unsigned int lines_per_thread = 2;
-    int* pie = pre_kmp(pattern);
 
     while(getline(in, line)) {
         chunk.push_back(line);
         counter++;
         
         if(counter % lines_per_thread == 0) {
-            threads.push_back(thread(process_chunk, chunk, pattern, counter - lines_per_thread, pie));
+            threads.push_back(thread(process_chunk, chunk, pattern, counter - lines_per_thread));
             chunk.clear();
         }
     }
 
     if(!chunk.empty()) {
-        threads.push_back(thread(process_chunk, chunk, pattern, counter - chunk.size(), pie));
+        threads.push_back(thread(process_chunk, chunk, pattern, counter - chunk.size()));
     }
 
     in.close();
@@ -150,8 +154,6 @@ int main(int argc, char* argv []) {
     }
 
     cout << "Total matches: " << quantity << endl;
-
-    delete[] pie;
 
     return 0;
 }
